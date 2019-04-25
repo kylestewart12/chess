@@ -3,10 +3,55 @@ class Chess
 
   def initialize
     @board = Board.new
-    @white = Player.new("white")
-    @black = Player.new("black")
+    @white = Player.new("white", self)
+    @black = Player.new("black", self)
     @white.set_board(@board)
     @black.set_board(@board)
+  end
+
+  def what_time_is_it__game_time
+    puts "Welcome to Command Line Chess, the absolute worst way to play the game!"
+    puts "The instructions are simple."
+    puts "Each turn, you'll be shown a numbered list of your pieces."
+    puts "Enter the number to select that piece."
+    puts "You'll then be shown a numbered list of available moves for that piece."
+    puts "Again, enter the number corresponding to the square to which you want to move."
+    
+    puts "Now, let's begin!"
+    puts "White moves first."
+
+    current_player = @white
+    @board.show
+    game_over = false
+    
+    until game_over
+      piece_moved = current_player.make_move(@board)
+      if current_player == @white
+        if piece_moved.allowed_moves.include?(@black.pieces["king"])
+          @black.in_check = true
+        end
+        current_player = @black
+      else
+        if piece_moved.allowed_moves.include?(@white.pieces["king"])
+          @white.in_check = true
+        end
+        current_player = @white
+      end
+      @board.show
+
+      if @white.victor
+        puts "Checkmate. White is the winner!"
+        game_over
+      elsif @black.victor
+        puts "Checkmate. Black is the winner!"
+      end
+      
+    end
+
+  end
+
+  def winner_winner_chicken_dinner
+
   end
 
 end
@@ -47,6 +92,13 @@ class Board
     new_index = position_index(new_position)
     new_x = new_index[0]
     new_y = new_index[1]
+  
+  def remove_piece(piece)
+    index = position_index(piece.position)
+    x = index[0]
+    y = index[1]
+    @squares[y][x] = "-"
+  end
 
     @squares[old_y][old_x] = "-"
     @squares[new_y][new_x] = piece.symbol
@@ -74,13 +126,16 @@ class Board
 end
 
 class Player
-  attr_reader :color, :pieces
+  attr_reader :color, :pieces, :victor
   attr_accessor :in_check
 
-  def initialize(color)
+
+  def initialize(color, game)
     @color = color
-    @pieces = []
+    @pieces = {}
+    @game = game
     @in_check = false
+    @victor = false
   end
 
   def set_board(board)
@@ -91,28 +146,29 @@ class Player
       row_1 = 8
       row_2 = 7
     end
-
+    
     for i in 97..104
-      @pieces << Pawn.new(self, [i.chr, row_2], board)
+      @pieces["pawn#{i}"] = Pawn.new(self, [i.chr, row_2], board)
     end
     
-    @pieces << Rook.new(self, ["a", row_1], board)
-    @pieces << Rook.new(self, ["h", row_1], board)
-    @pieces << Knight.new(self, ["b", row_1])
-    @pieces << Knight.new(self, ["g", row_1])
-    @pieces << Bishop.new(self, ["c", row_1], board)
-    @pieces << Bishop.new(self, ["f", row_1], board)
-    @pieces << Queen.new(self, ["d", row_1], board)
-    @pieces << King.new(self, ["e", row_1])
     
-    @pieces.each do |piece|
+    @pieces["rook1"] = Rook.new(self, ["a", row_1], board)
+    @pieces["rook2"] = Rook.new(self, ["h", row_1], board)
+    @pieces["knight1"] = Knight.new(self, ["b", row_1])
+    @pieces["knight2"] = Knight.new(self, ["g", row_1])
+    @pieces["bishop1"] = Bishop.new(self, ["c", row_1], board)
+    @pieces["bishop2"] = Bishop.new(self, ["f", row_1], board)
+    @pieces["queen"] = Queen.new(self, ["d", row_1], board)
+    @pieces["king"] = King.new(self, ["e", row_1])
+    
+    @pieces.values.each do |piece|
       board.add_piece(piece)
     end
   end
 
   def occupied_squares
     occupied = []
-    @pieces.each do |piece|
+    @pieces.values.each do |piece|
       occupied << piece.position
     end
     occupied
@@ -121,18 +177,25 @@ class Player
   def make_move(board)
     piece_chosen = false
     move_chosen = false
+    puts "#{@color.capitalize}\'s turn."
     until piece_chosen and move_chosen
       
+      if @in_check
+        piece_chosen = true
+        piece = @pieces["king"]
+      end
+
       until piece_chosen
         move_chosen = false
         puts "Select a piece"
-        @pieces.each_with_index do |p, i|
+        
+        @pieces.values.each_with_index do |p, i|
           puts "#{i+1}. #{p.class.name} at #{p.position[0]}#{p.position[1]}"
         end
         piece_num = gets.chomp.to_i
         if piece_num > 0 and piece_num <= @pieces.length
           piece_chosen = true
-          piece = @pieces[piece_num-1]
+          piece = @pieces.values[piece_num-1]
         end
       end
       
@@ -155,9 +218,24 @@ class Player
         end
       end
     end
+      
     puts "#{color.capitalize} moves #{piece.class.name} at " +
       "#{piece.position[0]}#{piece.position[1]} to #{move[0]}#{move[1]}"
+    
+    if not board.free?(move)
+      if @color == "white"
+        other = @game.black
+      else
+        other = @game.white
+      end
+      other.pieces.delete_if {|key, val| val.position == move and key != "king"}
+      if other.pieces["king"].position == move
+        @victor = true
+      end
+    end
     board.move_piece(piece, move)
+    piece.position = move
+    piece
   end
 
   
@@ -580,6 +658,4 @@ class King
 end
 
 game = Chess.new
-game.board.show
-game.black.make_move(game.board)
-game.board.show
+game.what_time_is_it__game_time
